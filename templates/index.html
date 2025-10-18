@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛩️ ADS-B Tracker Pro</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            overflow: hidden;
+        }
+        
+        #map {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        .info-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 24px;
+            min-width: 320px;
+            z-index: 1000;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+        }
+        
+        .info-panel h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #0f172a;
+            border-bottom: 3px solid #3b82f6;
+            padding-bottom: 10px;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .stat-label {
+            color: #64748b;
+            font-size: 14px;
+        }
+        
+        .stat-value {
+            color: #0f172a;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        
+        .stat-value.warning { color: #f59e0b; }
+        .stat-value.success { color: #10b981; }
+        .stat-value.info { color: #3b82f6; }
+        
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: white;
+            border: 2px solid #10b981;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 1000;
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.2);
+        }
+        
+        .connection-status.disconnected {
+            border-color: #ef4444;
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.2);
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 16px 24px;
+            z-index: 1000;
+            display: flex;
+            gap: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn.secondary {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+        }
+        
+        /* Leaflet popup styling */
+        .leaflet-popup-content-wrapper {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .aircraft-popup {
+            padding: 16px;
+            min-width: 280px;
+        }
+        
+        .aircraft-popup h3 {
+            color: #0f172a;
+            margin-bottom: 12px;
+            font-size: 16px;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 8px;
+        }
+        
+        .aircraft-popup p {
+            margin: 8px 0;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .aircraft-popup strong {
+            color: #64748b;
+        }
+        
+        .aircraft-popup .value {
+            color: #0f172a;
+            font-weight: 600;
+        }
+        
+        .trail-btn {
+            margin-top: 12px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .trail-btn:hover {
+            background: #2563eb;
+        }
+        
+        .trail-btn.active {
+            background: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="connection-status" id="status">
+        <span>Bağlanıyor...</span>
+    </div>
+    
+    <div class="info-panel">
+        <h2>📊 İstatistikler</h2>
+        <div class="stat-row">
+            <span class="stat-label">✈️ Uçak:</span>
+            <span class="stat-value info" id="aircraft">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">📡 Güncelleme:</span>
+            <span class="stat-value" id="updates">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">🔧 Düzeltme:</span>
+            <span class="stat-value warning" id="corrections">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">⚠️ Outlier:</span>
+            <span class="stat-value warning" id="outliers">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">🛤️ Görünen İz:</span>
+            <span class="stat-value info" id="trails">0</span>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" onclick="resetPlayback()">🔄 Başa Sar</button>
+        <button class="btn" id="filterBtn" onclick="toggleFilter()">🌍 GLOBAL</button>
+        <button class="btn secondary" onclick="toggleTrails()">🛤️ İzler</button>
+        <button class="btn secondary" onclick="viewStats()">📈 Detay</button>
+    </div>
+
+    <script>
+        console.log("🚀 Uygulama başlatılıyor...");
+        
+        // Harita
+        const map = L.map('map').setView([41.0, 28.0], 7);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap | CARTO',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Global değişkenler
+        const markers = {};
+        const trails = {};
+        const trailVisible = {};
+        let allTrailsVisible = false;
+        let filterEnabled = true; // Başlangıçta bölgesel
+        
+        // Socket.IO
+        const socket = io();
+        
+        socket.on('connect', () => {
+            console.log('✅ Bağlandı');
+            document.getElementById('status').innerHTML = '<span>✅ Bağlı</span>';
+            document.getElementById('status').classList.remove('disconnected');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('❌ Bağlantı kesildi');
+            document.getElementById('status').innerHTML = '<span>❌ Bağlantı Kesildi</span>';
+            document.getElementById('status').classList.add('disconnected');
+        });
+        
+        socket.on('update', (data) => {
+            if (!data || !data.aircraft) return;
+            
+            console.log(`📡 ${data.aircraft.length} uçak alındı`);
+            
+            // İstatistikleri güncelle
+            if (data.stats) {
+                document.getElementById('aircraft').textContent = data.aircraft.length;
+                document.getElementById('updates').textContent = data.stats.total_updates || 0;
+                document.getElementById('corrections').textContent = data.stats.position_corrections || 0;
+                document.getElementById('outliers').textContent = data.stats.outliers_detected || 0;
+                
+                const visibleTrails = Object.values(trailVisible).filter(v => v).length;
+                document.getElementById('trails').textContent = visibleTrails;
+            }
+            
+            // Uçakları güncelle
+            const currentHexes = new Set();
+            
+            data.aircraft.forEach((ac, idx) => {
+                const hex = ac.hex;
+                currentHexes.add(hex);
+                
+                if (idx === 0) {
+                    console.log(`✈️ İlk uçak: ${hex}, Lat: ${ac.lat}, Lon: ${ac.lon}, Track: ${ac.track}°`);
+                }
+                
+                // İz oluştur/güncelle
+                if (ac._trail && ac._trail.length > 1) {
+                    if (!trails[hex]) {
+                        trails[hex] = L.polyline([], {
+                            color: '#3b82f6',
+                            weight: 3,
+                            opacity: 0.6
+                        });
+                        trailVisible[hex] = false;
+                    }
+                    
+                    const coords = ac._trail.map(p => [p.lat, p.lon]);
+                    trails[hex].setLatLngs(coords);
+                    
+                    if (trailVisible[hex] || allTrailsVisible) {
+                        if (!map.hasLayer(trails[hex])) {
+                            trails[hex].addTo(map);
+                        }
+                    }
+                }
+                
+                // Marker oluştur/güncelle
+                if (!markers[hex]) {
+                    // Yeni marker - SVG UÇAK İKONU (PROFESYONEL + DOĞRU YÖN!)
+                    const iconColor = ac._corrected ? '#f59e0b' : '#3b82f6';
+                    const icon = L.divIcon({
+                        html: `
+                            <div style="
+                                transform: rotate(${ac.track || 0}deg); 
+                                width: 32px;
+                                height: 32px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">
+                                <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                                    <!-- Uçak şekli (Kuzey=yukarı) -->
+                                    <g>
+                                        <!-- Gövde -->
+                                        <path d="M 16 4 L 17 16 L 16 28 L 15 16 Z" 
+                                              fill="${iconColor}" 
+                                              stroke="#1e40af" 
+                                              stroke-width="1"/>
+                                        
+                                        <!-- Kanatlar -->
+                                        <path d="M 6 16 L 16 15 L 26 16 L 16 17 Z" 
+                                              fill="${iconColor}" 
+                                              opacity="0.9"
+                                              stroke="#1e40af" 
+                                              stroke-width="1"/>
+                                        
+                                        <!-- Kuyruk -->
+                                        <path d="M 14 26 L 16 30 L 18 26 Z" 
+                                              fill="${iconColor}" 
+                                              stroke="#1e40af" 
+                                              stroke-width="0.5"/>
+                                        
+                                        <!-- Burun (beyaz nokta) -->
+                                        <circle cx="16" cy="6" r="2" fill="white" opacity="0.9"/>
+                                    </g>
+                                </svg>
+                            </div>
+                        `,
+                        className: '',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+                    
+                    const marker = L.marker([ac.lat, ac.lon], { icon }).addTo(map);
+                    
+                    // Popup
+                    const popup = `
+                        <div class="aircraft-popup">
+                            <h3>✈️ ${ac.flight?.trim() || hex.toUpperCase()}</h3>
+                            <p><strong>ICAO:</strong> <span class="value">${hex.toUpperCase()}</span></p>
+                            ${ac.altitude ? `<p><strong>Yükseklik:</strong> <span class="value">${ac.altitude.toLocaleString()} ft</span></p>` : ''}
+                            ${ac.speed ? `<p><strong>Hız:</strong> <span class="value">${Math.round(ac.speed)} kts</span></p>` : ''}
+                            ${ac.track ? `<p><strong>Heading:</strong> <span class="value">${Math.round(ac.track)}°</span></p>` : ''}
+                            ${trails[hex] ? `<button class="trail-btn" onclick="toggleTrail('${hex}')">🛤️ İzi Göster</button>` : ''}
+                        </div>
+                    `;
+                    
+                    marker.bindPopup(popup);
+                    markers[hex] = marker;
+                    
+                    console.log(`➕ Yeni marker eklendi: ${hex}`);
+                } else {
+                    // Mevcut marker'ı güncelle (YÖN DÜZELTİLDİ!)
+                    markers[hex].setLatLng([ac.lat, ac.lon]);
+                    
+                    const icon = L.divIcon({
+                        html: `
+                            <div style="
+                                transform: rotate(${ac.track || 0}deg); 
+                                font-size: 24px; 
+                                filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+                                width: 24px;
+                                height: 24px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">
+                                ✈️
+                            </div>
+                        `,
+                        className: '',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    
+                    markers[hex].setIcon(icon);
+                }
+            });
+            
+            // Eski uçakları temizle
+            Object.keys(markers).forEach(hex => {
+                if (!currentHexes.has(hex)) {
+                    map.removeLayer(markers[hex]);
+                    delete markers[hex];
+                    
+                    if (trails[hex]) {
+                        if (map.hasLayer(trails[hex])) {
+                            map.removeLayer(trails[hex]);
+                        }
+                        delete trails[hex];
+                        delete trailVisible[hex];
+                    }
+                }
+            });
+            
+            console.log(`📍 Toplam marker: ${Object.keys(markers).length}`);
+        });
+        
+        // İz toggle (tek uçak)
+        function toggleTrail(hex) {
+            if (!trails[hex]) return;
+            
+            if (trailVisible[hex]) {
+                map.removeLayer(trails[hex]);
+                trailVisible[hex] = false;
+            } else {
+                trails[hex].addTo(map);
+                trailVisible[hex] = true;
+            }
+            
+            // Popup'ı güncelle
+            if (markers[hex]) {
+                markers[hex].closePopup();
+            }
+        }
+        
+        // Tüm izleri toggle
+        function toggleTrails() {
+            allTrailsVisible = !allTrailsVisible;
+            
+            Object.keys(trails).forEach(hex => {
+                if (allTrailsVisible) {
+                    trails[hex].addTo(map);
+                    trailVisible[hex] = true;
+                } else {
+                    if (map.hasLayer(trails[hex])) {
+                        map.removeLayer(trails[hex]);
+                    }
+                    trailVisible[hex] = false;
+                }
+            });
+            
+            console.log(`🛤️ Tüm izler: ${allTrailsVisible ? 'Gösteriliyor' : 'Gizli'}`);
+        }
+        
+        // Başa sar
+        function resetPlayback() {
+            fetch('/api/control/reset', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    console.log('✅ Reset:', data.message);
+                    alert(data.message);
+                })
+                .catch(err => console.error('❌ Reset hatası:', err));
+        }
+        
+        // GLOBAL/BÖLGESEL TOGGLE
+        function toggleFilter() {
+            fetch('/api/control/toggle-filter', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        filterEnabled = data.enabled;
+                        const btn = document.getElementById('filterBtn');
+                        
+                        if (filterEnabled) {
+                            btn.textContent = '🎯 BÖLGESEL';
+                            btn.className = 'btn';
+                            btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                        } else {
+                            btn.textContent = '🌍 GLOBAL';
+                            btn.className = 'btn';
+                            btn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                        }
+                        
+                        console.log('✅ Filtre:', data.message);
+                        alert(data.message);
+                    } else {
+                        console.error('❌ Toggle hatası:', data.message);
+                    }
+                })
+                .catch(err => console.error('❌ Toggle hatası:', err));
+        }
+        
+        // Sayfa yüklendiğinde buton durumunu ayarla
+        window.addEventListener('load', () => {
+            const btn = document.getElementById('filterBtn');
+            if (filterEnabled) {
+                btn.textContent = '🎯 BÖLGESEL';
+                btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            }
+        });
+        
+        // İstatistikler
+        function viewStats() {
+            window.open('/api/stats', '_blank');
+        }
+        
+        console.log("✅ Script yüklendi, WebSocket bekleniyor...");
+    </script>
+</body>
+</html>

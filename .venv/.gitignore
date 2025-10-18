@@ -1,0 +1,121 @@
+# ================================
+# Python
+# ================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ================================
+# Virtual Environment
+# ================================
+venv/
+.venv/
+ENV/
+env/
+.virtualenv
+
+# ================================
+# IDE / Editor
+# ================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.code-workspace
+
+# ================================
+# Database
+# ================================
+*.db
+*.sqlite
+*.sqlite3
+flight_history.db
+
+# ================================
+# Test / Temp Files
+# ================================
+dump1090_json/
+*.log
+*.tmp
+.pytest_cache/
+.coverage
+htmlcov/
+test_*.py
+check_*.py
+
+# ================================
+# Node.js (Gereksiz)
+# ================================
+node_modules/
+node-js/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# ================================
+# JSON Veri Dosyaları
+# ================================
+json_files/*.json
+!json_files/.gitkeep
+!json_files/sample_adsb_data.json
+
+# ================================
+# Windows
+# ================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ================================
+# macOS
+# ================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ================================
+# Linux
+# ================================
+*~
+.nfs*
+.directory
+
+# ================================
+# Backup Files
+# ================================
+*.bak
+*.backup
+*.old
+*_backup.*
+
+# ================================
+# Screenshots (Development)
+# ================================
+screenshots/*.png
+screenshots/*.jpg
+!screenshots/.gitkeep
