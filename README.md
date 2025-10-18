@@ -4,26 +4,16 @@
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![Flask](https://img.shields.io/badge/Flask-3.1+-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Status](https://img.shields.io/badge/Status-Active-success.svg)
 
 **Modern ve gelişmiş bir ADS-B uçak takip sistemi**
 
 JSON kayıtlarından veya canlı dump1090'dan veri alıp, akıllı outlier detection ile gerçek zamanlı harita üzerinde görselleştirir.
 
-[Demo](#-demo) • [Özellikler](#-özellikler) • [Kurulum](#-hızlı-başlangıç) • [Kullanım](#-kullanım) • [Katkıda Bulunma](#-katkıda-bulunma)
+ [Özellikler](#-özellikler) • [Kurulum](#-hızlı-başlangıç) • [Kullanım](#-kullanım) • [Katkıda Bulunma](#-katkıda-bulunma)
 
 </div>
 
----
-
-## 📸 Demo
-
-![ADS-B Tracker Screenshot](https://via.placeholder.com/800x400/f8fafc/3b82f6?text=ADS-B+Tracker+Pro)
-
-> **Not:** Gerçek ekran görüntüsünü `screenshots/` klasörüne ekleyebilirsiniz.
-
----
 
 ## ✨ Özellikler
 
@@ -58,7 +48,7 @@ JSON kayıtlarından veya canlı dump1090'dan veri alıp, akıllı outlier detec
 ### 1. Projeyi İndirin
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/adsb-tracker-pro.git
+https://github.com/cantekinn/ADSB-Signal-Tracker
 cd adsb-tracker-pro
 ```
 
@@ -326,11 +316,6 @@ Katkılarınızı bekliyoruz!
 
 ---
 
-## 📝 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
-
----
 
 ## 🙏 Teşekkürler
 
@@ -346,15 +331,11 @@ Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICE
 
 **Can Tekin**
 
-- GitHub: [@YOUR_USERNAME](https://github.com/YOUR_USERNAME)
-- Email: your.email@example.com
+- GitHub: https://github.com/cantekinn
+- Email: cantekin943@gmail.com
 
 ---
 
 <div align="center">
-
-**⭐ Bu projeyi beğendiyseniz yıldız vermeyi unutmayın!**
-
-Made with ❤️ in Turkey 🇹🇷
 
 </div>
