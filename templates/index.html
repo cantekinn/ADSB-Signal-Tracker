@@ -87,7 +87,6 @@
         
         .connection-status.disconnected {
             border-color: #ef4444;
-            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.2);
         }
         
         .controls {
@@ -126,7 +125,7 @@
             background: linear-gradient(135deg, #64748b 0%, #475569 100%);
         }
         
-        /* Leaflet popup styling */
+        /* Leaflet popup */
         .leaflet-popup-content-wrapper {
             background: white;
             border: 2px solid #e2e8f0;
@@ -224,7 +223,7 @@
     </div>
 
     <script>
-        console.log("🚀 Uygulama başlatılıyor...");
+        console.log("🚀 ADS-B Tracker Pro - YENİ SVG SİSTEMİ");
         
         // Harita
         const map = L.map('map').setView([41.0, 28.0], 7);
@@ -238,13 +237,69 @@
         const trails = {};
         const trailVisible = {};
         let allTrailsVisible = false;
-        let filterEnabled = true; // Başlangıçta bölgesel
+        let filterEnabled = true;
+        
+        // ==========================================
+        // PROFESYONEL UÇAK SVG İKONU
+        // Track: 0° = Kuzey (yukarı), 90° = Doğu (sağ)
+        // ==========================================
+        function createPlaneIcon(track, isCorrected) {
+            const color = isCorrected ? '#f59e0b' : '#3b82f6';
+            
+            // SVG uçak - Varsayılan olarak YUKARI (0°) bakıyor
+            const svg = `
+                <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"
+                     style="transform: rotate(${track}deg);">
+                    <defs>
+                        <filter id="shadow">
+                            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.4"/>
+                        </filter>
+                    </defs>
+                    <g filter="url(#shadow)">
+                        <!-- Uçak gövdesi (dikey - yukarı bakan) -->
+                        <path d="M 20 5 L 22 20 L 20 35 L 18 20 Z" 
+                              fill="${color}" 
+                              stroke="white" 
+                              stroke-width="1.5"/>
+                        
+                        <!-- Kanatlar (yatay) -->
+                        <path d="M 8 20 L 20 18 L 32 20 L 20 22 Z" 
+                              fill="${color}" 
+                              opacity="0.9"
+                              stroke="white" 
+                              stroke-width="1.5"/>
+                        
+                        <!-- Kuyruk kanatları -->
+                        <path d="M 16 32 L 20 36 L 24 32 Z" 
+                              fill="${color}" 
+                              opacity="0.85"
+                              stroke="white" 
+                              stroke-width="1"/>
+                        
+                        <!-- Burun (parlak nokta) -->
+                        <circle cx="20" cy="7" r="2.5" fill="white" opacity="0.95"/>
+                        
+                        <!-- Motor detayları -->
+                        <ellipse cx="14" cy="20" rx="1.5" ry="2" fill="white" opacity="0.7"/>
+                        <ellipse cx="26" cy="20" rx="1.5" ry="2" fill="white" opacity="0.7"/>
+                    </g>
+                </svg>
+            `;
+            
+            return L.divIcon({
+                html: `<div style="width: 40px; height: 40px;">${svg}</div>`,
+                className: '',
+                iconSize: [40, 40],
+                iconAnchor: [20, 20],
+                popupAnchor: [0, -20]
+            });
+        }
         
         // Socket.IO
         const socket = io();
         
         socket.on('connect', () => {
-            console.log('✅ Bağlandı');
+            console.log('✅ WebSocket bağlandı');
             document.getElementById('status').innerHTML = '<span>✅ Bağlı</span>';
             document.getElementById('status').classList.remove('disconnected');
         });
@@ -256,7 +311,10 @@
         });
         
         socket.on('update', (data) => {
-            if (!data || !data.aircraft) return;
+            if (!data || !data.aircraft) {
+                console.warn('⚠️ Veri alınamadı');
+                return;
+            }
             
             console.log(`📡 ${data.aircraft.length} uçak alındı`);
             
@@ -278,9 +336,9 @@
                 const hex = ac.hex;
                 currentHexes.add(hex);
                 
-                if (idx === 0) {
-                    console.log(`✈️ İlk uçak: ${hex}, Lat: ${ac.lat}, Lon: ${ac.lon}, Track: ${ac.track}°`);
-                }
+                const track = ac.track || 0;
+                const lat = ac.lat;
+                const lon = ac.lon;
                 
                 // İz oluştur/güncelle
                 if (ac._trail && ac._trail.length > 1) {
@@ -305,61 +363,21 @@
                 
                 // Marker oluştur/güncelle
                 if (!markers[hex]) {
-                    // Yeni marker - SVG UÇAK İKONU (PROFESYONEL + DOĞRU YÖN!)
-                    const iconColor = ac._corrected ? '#f59e0b' : '#3b82f6';
-                    const icon = L.divIcon({
-                        html: `
-                            <div style="
-                                transform: rotate(${ac.track || 0}deg); 
-                                width: 32px;
-                                height: 32px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            ">
-                                <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                                    <!-- Uçak şekli (Kuzey=yukarı) -->
-                                    <g>
-                                        <!-- Gövde -->
-                                        <path d="M 16 4 L 17 16 L 16 28 L 15 16 Z" 
-                                              fill="${iconColor}" 
-                                              stroke="#1e40af" 
-                                              stroke-width="1"/>
-                                        
-                                        <!-- Kanatlar -->
-                                        <path d="M 6 16 L 16 15 L 26 16 L 16 17 Z" 
-                                              fill="${iconColor}" 
-                                              opacity="0.9"
-                                              stroke="#1e40af" 
-                                              stroke-width="1"/>
-                                        
-                                        <!-- Kuyruk -->
-                                        <path d="M 14 26 L 16 30 L 18 26 Z" 
-                                              fill="${iconColor}" 
-                                              stroke="#1e40af" 
-                                              stroke-width="0.5"/>
-                                        
-                                        <!-- Burun (beyaz nokta) -->
-                                        <circle cx="16" cy="6" r="2" fill="white" opacity="0.9"/>
-                                    </g>
-                                </svg>
-                            </div>
-                        `,
-                        className: '',
-                        iconSize: [32, 32],
-                        iconAnchor: [16, 16]
-                    });
-                    
-                    const marker = L.marker([ac.lat, ac.lon], { icon }).addTo(map);
+                    // YENİ MARKER
+                    const icon = createPlaneIcon(track, ac._corrected || false);
+                    const marker = L.marker([lat, lon], { icon }).addTo(map);
                     
                     // Popup
                     const popup = `
                         <div class="aircraft-popup">
                             <h3>✈️ ${ac.flight?.trim() || hex.toUpperCase()}</h3>
                             <p><strong>ICAO:</strong> <span class="value">${hex.toUpperCase()}</span></p>
+                            ${ac.r ? `<p><strong>Kayıt:</strong> <span class="value">${ac.r}</span></p>` : ''}
+                            ${ac.t ? `<p><strong>Tip:</strong> <span class="value">${ac.t}</span></p>` : ''}
                             ${ac.altitude ? `<p><strong>Yükseklik:</strong> <span class="value">${ac.altitude.toLocaleString()} ft</span></p>` : ''}
                             ${ac.speed ? `<p><strong>Hız:</strong> <span class="value">${Math.round(ac.speed)} kts</span></p>` : ''}
-                            ${ac.track ? `<p><strong>Heading:</strong> <span class="value">${Math.round(ac.track)}°</span></p>` : ''}
+                            <p><strong>Heading:</strong> <span class="value">${Math.round(track)}°</span></p>
+                            ${ac._corrected ? '<p style="color: #f59e0b; font-weight: 600; margin-top: 8px;">⚠️ Pozisyon düzeltildi</p>' : ''}
                             ${trails[hex] ? `<button class="trail-btn" onclick="toggleTrail('${hex}')">🛤️ İzi Göster</button>` : ''}
                         </div>
                     `;
@@ -367,32 +385,24 @@
                     marker.bindPopup(popup);
                     markers[hex] = marker;
                     
-                    console.log(`➕ Yeni marker eklendi: ${hex}`);
+                    if (idx === 0) {
+                        console.log(`✈️ Yeni: ${hex} @ [${lat.toFixed(4)}, ${lon.toFixed(4)}] heading: ${track}°`);
+                    }
                 } else {
-                    // Mevcut marker'ı güncelle (YÖN DÜZELTİLDİ!)
-                    markers[hex].setLatLng([ac.lat, ac.lon]);
+                    // MEVCUT MARKER - POZİSYON VE YÖN GÜNCELLE
+                    const marker = markers[hex];
+                    const oldPos = marker.getLatLng();
                     
-                    const icon = L.divIcon({
-                        html: `
-                            <div style="
-                                transform: rotate(${ac.track || 0}deg); 
-                                font-size: 24px; 
-                                filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-                                width: 24px;
-                                height: 24px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            ">
-                                ✈️
-                            </div>
-                        `,
-                        className: '',
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                    });
+                    marker.setLatLng([lat, lon]);
                     
-                    markers[hex].setIcon(icon);
+                    // İKONU YENİLE (yön değişimi için kritik!)
+                    const icon = createPlaneIcon(track, ac._corrected || false);
+                    marker.setIcon(icon);
+                    
+                    if (idx === 0) {
+                        const moved = (oldPos.lat !== lat || oldPos.lng !== lon);
+                        console.log(`🔄 Güncelleme: ${hex} @ [${lat.toFixed(4)}, ${lon.toFixed(4)}] heading: ${track}° ${moved ? '(HAREKET ETTİ ✓)' : '(AYNI YER)'}`);
+                    }
                 }
             });
             
@@ -412,10 +422,10 @@
                 }
             });
             
-            console.log(`📍 Toplam marker: ${Object.keys(markers).length}`);
+            console.log(`📍 Aktif marker: ${Object.keys(markers).length}`);
         });
         
-        // İz toggle (tek uçak)
+        // İz toggle
         function toggleTrail(hex) {
             if (!trails[hex]) return;
             
@@ -426,14 +436,9 @@
                 trails[hex].addTo(map);
                 trailVisible[hex] = true;
             }
-            
-            // Popup'ı güncelle
-            if (markers[hex]) {
-                markers[hex].closePopup();
-            }
         }
         
-        // Tüm izleri toggle
+        // Tüm izler
         function toggleTrails() {
             allTrailsVisible = !allTrailsVisible;
             
@@ -448,8 +453,6 @@
                     trailVisible[hex] = false;
                 }
             });
-            
-            console.log(`🛤️ Tüm izler: ${allTrailsVisible ? 'Gösteriliyor' : 'Gizli'}`);
         }
         
         // Başa sar
@@ -463,7 +466,7 @@
                 .catch(err => console.error('❌ Reset hatası:', err));
         }
         
-        // GLOBAL/BÖLGESEL TOGGLE
+        // Global/Bölgesel toggle
         function toggleFilter() {
             fetch('/api/control/toggle-filter', { method: 'POST' })
                 .then(res => res.json())
@@ -474,38 +477,33 @@
                         
                         if (filterEnabled) {
                             btn.textContent = '🎯 BÖLGESEL';
-                            btn.className = 'btn';
                             btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                         } else {
                             btn.textContent = '🌍 GLOBAL';
-                            btn.className = 'btn';
                             btn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
                         }
                         
                         console.log('✅ Filtre:', data.message);
                         alert(data.message);
-                    } else {
-                        console.error('❌ Toggle hatası:', data.message);
                     }
                 })
                 .catch(err => console.error('❌ Toggle hatası:', err));
         }
         
-        // Sayfa yüklendiğinde buton durumunu ayarla
+        // Sayfa yüklendiğinde
         window.addEventListener('load', () => {
             const btn = document.getElementById('filterBtn');
             if (filterEnabled) {
                 btn.textContent = '🎯 BÖLGESEL';
                 btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
             }
+            console.log('✅ Yeni SVG uçak sistemi aktif - 0° = Kuzey (yukarı)');
         });
         
         // İstatistikler
         function viewStats() {
             window.open('/api/stats', '_blank');
         }
-        
-        console.log("✅ Script yüklendi, WebSocket bekleniyor...");
     </script>
 </body>
 </html>
